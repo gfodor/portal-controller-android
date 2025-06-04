@@ -1,6 +1,8 @@
 apply plugin: 'com.android.application'
 
 android {
+    namespace 'com.example.alex.arcore_rosbridge'
+
     compileSdkVersion 28
     defaultConfig {
         applicationId "com.example.alex.arcore_rosbridge"
