@@ -1,8 +1,10 @@
 package com.example.alex.arcore_rosbridge;
 
+import android.Manifest;
 import android.app.Activity;
 import android.app.ActivityManager;
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
@@ -15,6 +17,10 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+
 import com.google.ar.core.Anchor;
 import com.google.ar.core.AugmentedImage;
 import com.google.ar.core.Frame;
@@ -24,7 +30,6 @@ import com.google.ar.sceneform.Node;
 import com.google.ar.sceneform.math.Quaternion;
 import com.google.ar.sceneform.math.Vector3;
 import com.google.ar.sceneform.ux.ArFragment;
-import com.google.ar.sceneform.ux.TransformableNode;
 import com.jilk.ros.ROSClient;
 import com.jilk.ros.Topic;
 import com.jilk.ros.message.Pose;
@@ -36,10 +41,10 @@ import java.io.InputStream;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.FragmentTransaction;
-
 
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = MainActivity.class.getSimpleName();
@@ -66,6 +71,12 @@ public class MainActivity extends AppCompatActivity {
     private TextView rot_y_txt;
     private TextView rot_z_txt;
     private TextView rot_w_txt;
+
+    // BLE integration
+    private static final UUID PORTAL_SERVICE_UUID =
+            UUID.fromString("f8b69c7b-3a91-4f2d-8e7a-9c4d35d5f49a");
+    private static final int REQ_BLE_PERMS = 0xB1E;
+    private BleClient bleClient;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -248,6 +259,14 @@ public class MainActivity extends AppCompatActivity {
                 cam_map_topic.publish(odom_map_msg);
             }
         });
+
+        // Start BLE integration
+        if (hasBlePermissions()) {
+            bleClient = new BleClient(this, PORTAL_SERVICE_UUID);
+            bleClient.start();
+        } else {
+            requestBlePermissions();
+        }
     }
 
     /**
@@ -279,4 +298,56 @@ public class MainActivity extends AppCompatActivity {
         return true;
     }
 
+    // ───── BLE permission helpers ─────
+    private boolean hasBlePermissions() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            // For Android 12/13, also require fine location if targetSdk < 31
+            return ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN)
+                == PackageManager.PERMISSION_GRANTED
+                && ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT)
+                == PackageManager.PERMISSION_GRANTED
+                && ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED;
+        } else {
+            // For Android 6-11
+            return ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED;
+        }
+    }
+
+    private void requestBlePermissions() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            ActivityCompat.requestPermissions(
+                this,
+                new String[] {
+                    Manifest.permission.BLUETOOTH_SCAN,
+                    Manifest.permission.BLUETOOTH_CONNECT,
+                    // Always include location on 12/13 when targetSdk < 31
+                    Manifest.permission.ACCESS_FINE_LOCATION
+                },
+                REQ_BLE_PERMS
+            );
+        } else {
+            ActivityCompat.requestPermissions(
+                this,
+                new String[] { Manifest.permission.ACCESS_FINE_LOCATION },
+                REQ_BLE_PERMS
+            );
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int reqCode, @NonNull String[] perms, @NonNull int[] res) {
+        super.onRequestPermissionsResult(reqCode, perms, res);
+        if (reqCode == REQ_BLE_PERMS && hasBlePermissions()) {
+            bleClient = new BleClient(this, PORTAL_SERVICE_UUID);
+            bleClient.start();
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (bleClient != null) bleClient.stop();
+        super.onDestroy();
+    }
 }
