@@ -258,6 +258,13 @@ public class MainActivity extends AppCompatActivity {
                 odom_map_msg.orientation.w = cam_node.getLocalRotation().w;
                 cam_map_topic.publish(odom_map_msg);
             }
+
+            if (bleClient != null) {
+                Vector3 p = cam_node.getLocalPosition();
+                Quaternion q = cam_node.getLocalRotation();
+                bleClient.sendPose(new float[]{p.x, p.y, p.z},
+                                   new float[]{q.x, q.y, q.z, q.w});
+            }
         });
 
         // Start BLE integration
