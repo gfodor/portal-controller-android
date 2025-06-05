@@ -46,6 +46,7 @@ public class BleClient {
     // Added packet type constants
     private static final byte PACKET_POSE       = 0x00;
     private static final byte PACKET_CALIBRATION = 0x01;
+    private static final byte PACKET_APRILTAG    = 0x02;
 
     public BleClient(Context ctx, UUID serviceUuid) {
         this.context = ctx.getApplicationContext();
@@ -136,6 +137,21 @@ public class BleClient {
           .putFloat(quat[0]).putFloat(quat[1]).putFloat(quat[2]).putFloat(quat[3]);
         rxChar.setValue(bb.array());
         boolean ok = gatt.writeCharacteristic(rxChar);
+    }
+
+    public void sendAprilTag(int id, float[] pos, float[] rotMat) {
+        if (!mtuReady || gatt == null || rxChar == null) {
+            Log.w(TAG, "AprilTag send skipped – mtuReady=" + mtuReady + " gatt=" + (gatt != null) + " rxChar=" + (rxChar != null));
+            return;
+        }
+        if (pos.length < 3 || rotMat.length < 9) return;
+        ByteBuffer bb = ByteBuffer.allocate(1 + 4 + 4 * (3 + 9)).order(ByteOrder.LITTLE_ENDIAN);
+        bb.put(PACKET_APRILTAG);
+        bb.putInt(id);
+        for (int i = 0; i < 3; i++) bb.putFloat(pos[i]);
+        for (int i = 0; i < 9; i++) bb.putFloat(rotMat[i]);
+        rxChar.setValue(bb.array());
+        gatt.writeCharacteristic(rxChar);
     }
 
     public void sendCalibration(float[] initPos, float[] initQuat,

@@ -378,6 +378,20 @@ public class MainActivity extends AppCompatActivity {
                     "AprilTag id=%d pos [%.3f %.3f %.3f] rot %s",
                     det.id, det.pose.x, det.pose.y, det.pose.z,
                     rot.toString().trim()));
+            float[] pos = {
+                    (float) det.pose.x,
+                    (float) det.pose.y,
+                    (float) det.pose.z
+            };
+            float[] rotMat = new float[9];
+            for (int i = 0; i < 3; i++) {
+                for (int j = 0; j < 3; j++) {
+                    rotMat[i * 3 + j] = (float) r.get(i, j);
+                }
+            }
+            if (bleClient != null) {
+                bleClient.sendAprilTag(det.id, pos, rotMat);
+            }
         }
     }
 }
