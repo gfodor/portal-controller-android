@@ -22,7 +22,7 @@
         android:id="@+id/arcore_gl_surface"
         android:layout_width="1dp"
         android:layout_height="1dp"
-        android:visibility="gone" />
+        android:visibility="invisible" />
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
