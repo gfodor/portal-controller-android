@@ -43,6 +43,10 @@ public class BleClient {
 
     private BluetoothGattCharacteristic rxChar;
 
+    // Added packet type constants
+    private static final byte PACKET_POSE       = 0x00;
+    private static final byte PACKET_CALIBRATION = 0x01;
+
     public BleClient(Context ctx, UUID serviceUuid) {
         this.context = ctx.getApplicationContext();
         this.serviceUuid = serviceUuid;
@@ -126,13 +130,16 @@ public class BleClient {
             Log.w(TAG, "Pose send skipped – mtuReady=" + mtuReady + " gatt=" + (gatt != null) + " rxChar=" + (rxChar != null));
             return;
         }
-        //ByteBuffer bb = ByteBuffer.allocate(28).order(ByteOrder.LITTLE_ENDIAN);
-        //bb.putFloat(pos[0]).putFloat(pos[1]).putFloat(pos[2]);
-        //bb.putFloat(quat[0]).putFloat(quat[1]).putFloat(quat[2]).putFloat(quat[3]);
-        //rxChar.setValue(bb.array());
-        ByteBuffer bb = ByteBuffer.allocate(4 * 7).order(ByteOrder.LITTLE_ENDIAN);
-        bb.putFloat(pos[0]).putFloat(pos[1]).putFloat(pos[2]).putFloat(quat[0]).putFloat(quat[1]).putFloat(quat[2]).putFloat(quat[3]);
+        ByteBuffer bb = ByteBuffer.allocate(1 + 4 * 7).order(ByteOrder.LITTLE_ENDIAN);
+        bb.put(PACKET_POSE);
+        bb.putFloat(pos[0]).putFloat(pos[1]).putFloat(pos[2])
+          .putFloat(quat[0]).putFloat(quat[1]).putFloat(quat[2]).putFloat(quat[3]);
         rxChar.setValue(bb.array());
         boolean ok = gatt.writeCharacteristic(rxChar);
+    }
+
+    public void sendCalibration(float[] initPos, float[] initQuat,
+                                float[] currPos, boolean last) {
+        if (!mtuReady || gatt == null || rxChar == null) return;
     }
 }

@@ -10,6 +10,7 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
+import android.view.MotionEvent;
 import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
@@ -58,6 +59,7 @@ public class MainActivity extends AppCompatActivity {
     private EditText rosmaster_ip_txt;
     private EditText rosbridge_port_txt;
     private Button connect_btn;
+    private Button calibration_btn;
 
     private Map<Integer, float[]> image_pos_dict;
     private Node map_node;
@@ -92,6 +94,32 @@ public class MainActivity extends AppCompatActivity {
         rosmaster_ip_txt = findViewById(R.id.rosmaster_ip_txt);
         rosbridge_port_txt = findViewById(R.id.rosbridge_port_txt);
         connect_btn = findViewById(R.id.connect_btn);
+        calibration_btn = findViewById(R.id.calibration_btn);
+        // click still resets map as before
+        calibration_btn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // Reset calibration so the next marker re-establishes map alignment
+                map_calibrated = false;
+                map_node.setParent(null);
+                cam_node.setParent(null);
+                Toast.makeText(getApplicationContext(),
+                        "Calibration reset – point camera at marker",
+                        Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        calibration_btn.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+                switch (event.getAction()) {
+                    case MotionEvent.ACTION_DOWN:
+                        // Calibration TODO
+                        return true;
+                }
+                return false;
+            }
+        });
 
         image_pos_dict = new HashMap<>();
         map_node = new Node();

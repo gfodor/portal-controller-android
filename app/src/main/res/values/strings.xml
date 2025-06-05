@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">ARCore_rosbridge</string>
+    <string name="calibrate">Calibrate</string>
 </resources>
