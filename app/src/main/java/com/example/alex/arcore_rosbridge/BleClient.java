@@ -154,8 +154,13 @@ public class BleClient {
         gatt.writeCharacteristic(rxChar);
     }
 
-    public void sendCalibration(float[] initPos, float[] initQuat,
-                                float[] currPos, boolean last) {
-        if (!mtuReady || gatt == null || rxChar == null) return;
+    /** Send a one-byte calibration trigger (packet type 0x01). */
+    public void sendCalibrationTrigger() {
+        if (!mtuReady || gatt == null || rxChar == null) {
+            Log.w(TAG, "Calibration trigger skipped – link not ready");
+            return;
+        }
+        rxChar.setValue(new byte[] { PACKET_CALIBRATION });
+        gatt.writeCharacteristic(rxChar);
     }
 }

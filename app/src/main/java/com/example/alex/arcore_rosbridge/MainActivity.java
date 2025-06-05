@@ -155,8 +155,12 @@ public class MainActivity extends AppCompatActivity {
         glSurfaceView.setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
         calibration_btn = findViewById(R.id.calibration_btn);
 
-        calibration_btn.setOnClickListener(v ->
-                Toast.makeText(getApplicationContext(), "Calibration reset", Toast.LENGTH_SHORT).show());
+        calibration_btn.setOnClickListener(v -> {
+            if (bleClient != null) {
+                bleClient.sendCalibrationTrigger();
+            }
+            Toast.makeText(getApplicationContext(), "Calibration sent", Toast.LENGTH_SHORT).show();
+        });
 
         pos_x_txt = findViewById(R.id.pos_x_txt);
         pos_y_txt = findViewById(R.id.pos_y_txt);
