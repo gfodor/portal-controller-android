@@ -20,6 +20,11 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import android.opengl.GLES11Ext;
+import android.opengl.GLES20;
+import android.opengl.GLSurfaceView;
+import javax.microedition.khronos.egl.EGLConfig;
+import javax.microedition.khronos.opengles.GL10;
 
 import com.google.ar.core.Config;
 import com.google.ar.core.Frame;
@@ -51,24 +56,59 @@ public class MainActivity extends AppCompatActivity {
     private float[] cam_pos = new float[3];
     private float[] cam_quat = new float[4];
 
-    private android.opengl.GLSurfaceView glSurfaceView;
+    private GLSurfaceView glSurfaceView;
     private android.os.Handler frameHandler = new android.os.Handler();
     private final Runnable frameUpdate = new Runnable() {
         @Override public void run() {
             if (arSession != null) {
-                try {
-                    Frame frame = arSession.update();
-                    if (frame.getCamera().getTrackingState() == TrackingState.TRACKING) {
-                        Pose pose = frame.getCamera().getDisplayOrientedPose();
-                        pose.getTranslation(cam_pos, 0);
-                        pose.getRotationQuaternion(cam_quat, 0);
-                        updatePoseViews();
+                glSurfaceView.queueEvent(() -> {
+                    try {
+                        Frame frame = arSession.update();
+                        if (frame.getCamera().getTrackingState() == TrackingState.TRACKING) {
+                            Pose pose = frame.getCamera().getDisplayOrientedPose();
+                            pose.getTranslation(cam_pos, 0);
+                            pose.getRotationQuaternion(cam_quat, 0);
+                            runOnUiThread(() -> updatePoseViews());
+                        }
+                    } catch (Exception ex) {
+                        Log.e(TAG, "Error updating AR session", ex);
                     }
-                } catch (Exception ignored) {}
+                });
+                glSurfaceView.requestRender();
             }
             frameHandler.postDelayed(this, 33);
         }
     };
+
+    private class SimpleRenderer implements GLSurfaceView.Renderer {
+        private int textureId;
+
+        @Override
+        public void onSurfaceCreated(GL10 gl, EGLConfig config) {
+            textureId = createCameraTexture();
+            if (arSession != null) {
+                arSession.setCameraTextureName(textureId);
+            }
+        }
+
+        @Override public void onSurfaceChanged(GL10 gl, int w, int h) {}
+
+        @Override public void onDrawFrame(GL10 gl) {
+            GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
+        }
+    }
+
+    private int createCameraTexture() {
+        int[] textures = new int[1];
+        GLES20.glGenTextures(1, textures, 0);
+        int texId = textures[0];
+        GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, texId);
+        GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR);
+        GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR);
+        GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE);
+        GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE);
+        return texId;
+    }
 
     private TextView pos_x_txt;
     private TextView pos_y_txt;
@@ -94,6 +134,9 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         glSurfaceView = findViewById(R.id.arcore_gl_surface);
+        glSurfaceView.setEGLContextClientVersion(2);
+        glSurfaceView.setRenderer(new SimpleRenderer());
+        glSurfaceView.setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
         rosmaster_ip_txt = findViewById(R.id.rosmaster_ip_txt);
         rosbridge_port_txt = findViewById(R.id.rosbridge_port_txt);
         connect_btn = findViewById(R.id.connect_btn);
@@ -252,6 +295,7 @@ public class MainActivity extends AppCompatActivity {
         if (arSession != null) {
             try { arSession.resume(); } catch (Exception ignored) {}
         }
+        glSurfaceView.onResume();
         frameHandler.post(frameUpdate);
     }
 
@@ -261,6 +305,7 @@ public class MainActivity extends AppCompatActivity {
         if (arSession != null) {
             arSession.pause();
         }
+        glSurfaceView.onPause();
         super.onPause();
     }
 
