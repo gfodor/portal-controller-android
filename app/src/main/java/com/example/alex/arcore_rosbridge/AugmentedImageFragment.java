@@ -2,9 +2,6 @@ package com.example.alex.arcore_rosbridge;
 
 import android.app.ActivityManager;
 import android.content.Context;
-import android.content.res.AssetManager;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
@@ -13,15 +10,14 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Toast;
 
-import com.google.ar.core.AugmentedImageDatabase;
 import com.google.ar.core.Config;
 import com.google.ar.core.Session;
 import com.google.ar.sceneform.ux.ArFragment;
 
-import java.io.IOException;
-import java.io.InputStream;
-
 import androidx.annotation.Nullable;
+
+import java.util.Collections;
+import java.util.Set;
 
 public class AugmentedImageFragment extends ArFragment {
     private static final String TAG = "AugmentedImageFragment";
@@ -64,29 +60,10 @@ public class AugmentedImageFragment extends ArFragment {
     @Override
     protected Config getSessionConfiguration(Session session) {
         Config config = super.getSessionConfiguration(session);
-        if (!setupAugmentedImageDatabase(config, session)) {
+        config.setPlaneFindingMode(Config.PlaneFindingMode.DISABLED);
+        config.setCloudAnchorMode(Config.CloudAnchorMode.DISABLED);
+        config.setLightEstimationMode(Config.LightEstimationMode.DISABLED);
 
-        }
         return config;
-    }
-
-    private boolean setupAugmentedImageDatabase(Config config, Session session) {
-        AugmentedImageDatabase augmentedImageDatabase;
-
-        AssetManager assetManager = getContext() != null ? getContext().getAssets() : null;
-        if (assetManager == null) {
-            Log.e(TAG, "Context is null, cannot intitialize image database.");
-            return false;
-        }
-
-        try (InputStream is = getContext().getAssets().open(SAMPLE_IMAGE_DATABASE)) {
-            augmentedImageDatabase = AugmentedImageDatabase.deserialize(session, is);
-        } catch (IOException e) {
-            Log.e(TAG, "IO exception loading augmented image database.", e);
-            return false;
-        }
-
-        config.setAugmentedImageDatabase(augmentedImageDatabase);
-        return true;
     }
 }
