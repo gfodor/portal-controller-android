@@ -44,6 +44,7 @@ import org.openftc.apriltag.AprilTagDetection;
 import org.openftc.apriltag.AprilTagDetectorJNI;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
+import org.opencv.android.OpenCVLoader;
 import org.firstinspires.ftc.robotcore.external.matrices.MatrixF;
 import java.util.ArrayList;
 import java.util.Locale;
@@ -136,6 +137,12 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // Load OpenCV native libs early
+        if (!OpenCVLoader.initDebug()) {
+            Log.e(TAG, "❌ OpenCV native library failed to load");
+        } else {
+            Log.i(TAG, "✅ OpenCV loaded");
+        }
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         if (!checkIsSupportedDeviceOrFinish(this)) {
             return;
