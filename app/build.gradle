@@ -43,4 +43,6 @@ dependencies {
 
     // AprilTag native detection library (includes prebuilt .so binaries)
     implementation 'org.openftc:apriltag:2.1.0'
+    implementation 'org.opencv:opencv-android:4.8.0'
+    implementation 'org.firstinspires.ftc:RobotCore:10.2.0'
 }

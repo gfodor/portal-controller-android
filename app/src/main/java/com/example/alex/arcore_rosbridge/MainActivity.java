@@ -40,6 +40,13 @@ import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.nio.ByteBuffer;
+import org.openftc.apriltag.AprilTagDetection;
+import org.openftc.apriltag.AprilTagDetectorJNI;
+import org.opencv.core.CvType;
+import org.opencv.core.Mat;
+import org.firstinspires.ftc.robotcore.external.matrices.MatrixF;
+import java.util.ArrayList;
+import java.util.Locale;
 
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -123,6 +130,8 @@ public class MainActivity extends AppCompatActivity {
     private BleClient bleClient;
     private final ExecutorService detectorExecutor = Executors.newSingleThreadExecutor();
     private long lastImageTime = 0;
+    private long aprilTagDetectorPtr = 0;
+    private static final double TAG_SIZE_METERS = 0.166;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -170,6 +179,8 @@ public class MainActivity extends AppCompatActivity {
             config.setCloudAnchorMode(Config.CloudAnchorMode.DISABLED);
             config.setLightEstimationMode(Config.LightEstimationMode.DISABLED);
             arSession.configure(config);
+            aprilTagDetectorPtr = AprilTagDetectorJNI.createApriltagDetector(
+                    AprilTagDetectorJNI.TagFamily.TAG_36h11.string, 2.0f, 1);
         } catch (Exception ex) {
             Toast toast = Toast.makeText(this, "ARCore unavailable: " + ex.getMessage(), Toast.LENGTH_LONG);
             toast.setGravity(Gravity.CENTER, 0, 0);
@@ -300,8 +311,14 @@ public class MainActivity extends AppCompatActivity {
             byte[] data = new byte[buf.remaining()];
             buf.get(data);
             img.close();
+            float[] fl = frame.getCamera().getImageIntrinsics().getFocalLength();
+            float[] pp = frame.getCamera().getImageIntrinsics().getPrincipalPoint();
+            float fx = fl[0];
+            float fy = fl[1];
+            float cx = pp[0];
+            float cy = pp[1];
             Log.d(TAG, "Captured image " + w + "x" + h + " at " + now);
-            detectorExecutor.execute(() -> runAprilTagStub(data, w, h));
+            detectorExecutor.execute(() -> runAprilTagDetector(data, w, h, fx, fy, cx, cy));
         } catch (NotYetAvailableException e) {
             // frame not ready; ignore
         }
@@ -320,14 +337,40 @@ public class MainActivity extends AppCompatActivity {
     protected void onDestroy() {
         if (bleClient != null) bleClient.stop();
         detectorExecutor.shutdown();
+        if (aprilTagDetectorPtr != 0) {
+            AprilTagDetectorJNI.releaseApriltagDetector(aprilTagDetectorPtr);
+            aprilTagDetectorPtr = 0;
+        }
         super.onDestroy();
     }
 
-    private void runAprilTagStub(byte[] data, int width, int height) {
-        try {
-            Thread.sleep(100);
-        } catch (InterruptedException ignored) {}
-        Log.d(TAG, "AprilTag stub processed frame " + width + "x" + height +
-                " at " + SystemClock.uptimeMillis());
+    private void runAprilTagDetector(byte[] data, int width, int height,
+                                     float fx, float fy, float cx, float cy) {
+        if (aprilTagDetectorPtr == 0) return;
+
+        Mat grey = new Mat(height, width, CvType.CV_8UC1);
+        grey.put(0, 0, data);
+
+        ArrayList<AprilTagDetection> detections =
+                AprilTagDetectorJNI.runAprilTagDetectorSimple(
+                        aprilTagDetectorPtr, grey, TAG_SIZE_METERS,
+                        fx, fy, cx, cy);
+
+        grey.release();
+
+        if (!detections.isEmpty()) {
+            AprilTagDetection det = detections.get(0);
+            MatrixF r = det.pose.R;
+            StringBuilder rot = new StringBuilder();
+            for (int i = 0; i < 3; i++) {
+                for (int j = 0; j < 3; j++) {
+                    rot.append(String.format(Locale.US, "%.3f ", r.get(i, j)));
+                }
+            }
+            Log.i(TAG, String.format(Locale.US,
+                    "AprilTag id=%d pos [%.3f %.3f %.3f] rot %s",
+                    det.id, det.pose.x, det.pose.y, det.pose.z,
+                    rot.toString().trim()));
+        }
     }
 }
