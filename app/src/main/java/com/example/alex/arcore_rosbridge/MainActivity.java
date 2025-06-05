@@ -9,11 +9,8 @@ import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Gravity;
-import android.view.View;
 import android.view.WindowManager;
-import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
-import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -31,9 +28,6 @@ import com.google.ar.core.Frame;
 import com.google.ar.core.Pose;
 import com.google.ar.core.Session;
 import com.google.ar.core.TrackingState;
-import com.jilk.ros.ROSClient;
-import com.jilk.ros.Topic;
-import com.jilk.ros.rosbridge.ROSBridgeClient;
 
 
 import java.util.UUID;
@@ -45,12 +39,6 @@ public class MainActivity extends AppCompatActivity {
     private static final double MIN_OPENGL_VERSION = 3.0;
 
     private Session arSession;
-    private boolean rosbridge_connected = false;
-    private ROSBridgeClient rosclient;
-
-    private EditText rosmaster_ip_txt;
-    private EditText rosbridge_port_txt;
-    private Button connect_btn;
     private Button calibration_btn;
 
     private float[] cam_pos = new float[3];
@@ -137,9 +125,6 @@ public class MainActivity extends AppCompatActivity {
         glSurfaceView.setEGLContextClientVersion(2);
         glSurfaceView.setRenderer(new SimpleRenderer());
         glSurfaceView.setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
-        rosmaster_ip_txt = findViewById(R.id.rosmaster_ip_txt);
-        rosbridge_port_txt = findViewById(R.id.rosbridge_port_txt);
-        connect_btn = findViewById(R.id.connect_btn);
         calibration_btn = findViewById(R.id.calibration_btn);
 
         calibration_btn.setOnClickListener(v ->
@@ -153,8 +138,6 @@ public class MainActivity extends AppCompatActivity {
         rot_z_txt = findViewById(R.id.rot_z_txt);
         rot_w_txt = findViewById(R.id.rot_w_txt);
 
-        rosmaster_ip_txt.clearFocus();
-        rosbridge_port_txt.clearFocus();
 
         try {
             arSession = new Session(this);
@@ -169,49 +152,6 @@ public class MainActivity extends AppCompatActivity {
             toast.show();
         }
 
-        connect_btn.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                rosmaster_ip_txt.clearFocus();
-                rosbridge_port_txt.clearFocus();
-                InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-                imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
-
-                String socket = "ws://" + rosmaster_ip_txt.getText().toString().trim() + ":" + rosbridge_port_txt.getText().toString().trim();
-                // Toast.makeText(getApplicationContext(), socket, Toast.LENGTH_LONG).show();
-                rosclient = new ROSBridgeClient(socket);
-                rosbridge_connected = rosclient.connect(new ROSClient.ConnectionStatusListener() {
-                    @Override
-                    public void onConnect() {
-                        runOnUiThread(() -> {
-                            if (rosbridge_connected) {
-                                Toast.makeText(getApplicationContext(), "Connected to ROS", Toast.LENGTH_LONG).show();
-                            }
-                        });
-                    }
-
-                    @Override
-                    public void onDisconnect(boolean normal, String reason, int code) {
-                        runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                Toast.makeText(getApplicationContext(), "Disconnected to ROS", Toast.LENGTH_LONG).show();
-                            }
-                        });
-                    }
-
-                    @Override
-                    public void onError(Exception ex) {
-                        runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                Toast.makeText(getApplicationContext(), "Error: " + ex.toString(), Toast.LENGTH_LONG).show();
-                            }
-                        });
-                    }
-                });
-            }
-        });
 
         // Start BLE integration
         if (hasBlePermissions()) {
@@ -318,19 +258,6 @@ public class MainActivity extends AppCompatActivity {
         rot_z_txt.setText(String.format("%.2f", cam_quat[2]));
         rot_w_txt.setText(String.format("%.2f", cam_quat[3]));
 
-        if (rosbridge_connected) {
-            Topic<com.jilk.ros.message.Pose> cam_topic = new Topic<>("/arcore/cam_pose", com.jilk.ros.message.Pose.class, rosclient);
-            cam_topic.advertise();
-            com.jilk.ros.message.Pose msg = new com.jilk.ros.message.Pose();
-            msg.position.x = cam_pos[0];
-            msg.position.y = cam_pos[1];
-            msg.position.z = cam_pos[2];
-            msg.orientation.x = cam_quat[0];
-            msg.orientation.y = cam_quat[1];
-            msg.orientation.z = cam_quat[2];
-            msg.orientation.w = cam_quat[3];
-            cam_topic.publish(msg);
-        }
 
         if (bleClient != null) {
             bleClient.sendPose(cam_pos, cam_quat);
