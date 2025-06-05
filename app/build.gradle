@@ -40,4 +40,7 @@ dependencies {
 
     implementation 'com.google.ar:core:1.14.0'
     // Using ARCore directly for lightweight tracking.
+
+    // AprilTag native detection library (includes prebuilt .so binaries)
+    implementation 'org.openftc:apriltag:2.1.0'
 }
