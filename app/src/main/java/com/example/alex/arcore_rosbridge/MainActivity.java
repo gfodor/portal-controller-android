@@ -132,7 +132,7 @@ public class MainActivity extends AppCompatActivity {
     private final ExecutorService detectorExecutor = Executors.newSingleThreadExecutor();
     private long lastImageTime = 0;
     private long aprilTagDetectorPtr = 0;
-    private static final double TAG_SIZE_METERS = 0.166;
+    private static final double TAG_SIZE_METERS = 0.032;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
