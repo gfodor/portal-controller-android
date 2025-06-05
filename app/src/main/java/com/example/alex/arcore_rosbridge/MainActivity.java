@@ -20,6 +20,8 @@ import androidx.core.content.ContextCompat;
 import android.opengl.GLES11Ext;
 import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
+import android.media.Image;
+import android.os.SystemClock;
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
@@ -28,9 +30,16 @@ import com.google.ar.core.Frame;
 import com.google.ar.core.Pose;
 import com.google.ar.core.Session;
 import com.google.ar.core.TrackingState;
+import com.google.ar.core.CameraConfig;
+import com.google.ar.core.CameraConfigFilter;
+import com.google.ar.core.exceptions.NotYetAvailableException;
+import android.util.Size;
 
 
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.nio.ByteBuffer;
 
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -58,6 +67,7 @@ public class MainActivity extends AppCompatActivity {
                             pose.getRotationQuaternion(cam_quat, 0);
                             runOnUiThread(() -> updatePoseViews());
                         }
+                        captureImageForDetector(frame);
                     } catch (Exception ex) {
                         Log.e(TAG, "Error updating AR session", ex);
                     }
@@ -111,6 +121,8 @@ public class MainActivity extends AppCompatActivity {
             UUID.fromString("f8b69c7b-3a91-4f2d-8e7a-9c4d35d5f49a");
     private static final int REQ_BLE_PERMS = 0xB1E;
     private BleClient bleClient;
+    private final ExecutorService detectorExecutor = Executors.newSingleThreadExecutor();
+    private long lastImageTime = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -141,6 +153,18 @@ public class MainActivity extends AppCompatActivity {
 
         try {
             arSession = new Session(this);
+            CameraConfigFilter filter = new CameraConfigFilter(arSession);
+            java.util.List<CameraConfig> configs = arSession.getSupportedCameraConfigs(filter);
+            CameraConfig chosen = configs.isEmpty() ? null : configs.get(0);
+            for (CameraConfig cc : configs) {
+                Size sz = cc.getImageSize();
+                if (sz.getWidth() >= 640 && sz.getHeight() >= 480) { chosen = cc; break; }
+            }
+            if (chosen != null) {
+                arSession.setCameraConfig(chosen);
+                Size s = chosen.getImageSize();
+                Log.i(TAG, "Camera config set to " + s.getWidth() + "x" + s.getHeight());
+            }
             Config config = new Config(arSession);
             config.setPlaneFindingMode(Config.PlaneFindingMode.DISABLED);
             config.setCloudAnchorMode(Config.CloudAnchorMode.DISABLED);
@@ -264,6 +288,25 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private void captureImageForDetector(Frame frame) {
+        long now = SystemClock.uptimeMillis();
+        if (now - lastImageTime < 1000) return;
+        lastImageTime = now;
+        try {
+            Image img = frame.acquireCameraImage();
+            int w = img.getWidth();
+            int h = img.getHeight();
+            ByteBuffer buf = img.getPlanes()[0].getBuffer();
+            byte[] data = new byte[buf.remaining()];
+            buf.get(data);
+            img.close();
+            Log.d(TAG, "Captured image " + w + "x" + h + " at " + now);
+            detectorExecutor.execute(() -> runAprilTagStub(data, w, h));
+        } catch (NotYetAvailableException e) {
+            // frame not ready; ignore
+        }
+    }
+
     @Override
     public void onRequestPermissionsResult(int reqCode, @NonNull String[] perms, @NonNull int[] res) {
         super.onRequestPermissionsResult(reqCode, perms, res);
@@ -276,6 +319,15 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         if (bleClient != null) bleClient.stop();
+        detectorExecutor.shutdown();
         super.onDestroy();
+    }
+
+    private void runAprilTagStub(byte[] data, int width, int height) {
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException ignored) {}
+        Log.d(TAG, "AprilTag stub processed frame " + width + "x" + height +
+                " at " + SystemClock.uptimeMillis());
     }
 }
