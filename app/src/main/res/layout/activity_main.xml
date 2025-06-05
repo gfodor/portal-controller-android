@@ -6,13 +6,7 @@
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
-    <fragment
-        android:id="@+id/ux_fragment"
-        android:name="com.example.alex.arcore_rosbridge.AugmentedImageFragment"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+
 
     <ImageView
         android:id="@+id/image_view_fit_to_scan"
@@ -21,6 +15,16 @@
         android:layout_gravity="center"
         android:scaleType="fitCenter"
         android:visibility="invisible"
+        />
+
+    <!-- Hidden surface used only for ARCore session -->
+    <android.opengl.GLSurfaceView
+        android:id="@+id/arcore_gl_surface"
+        android:layout_width="1dp"
+        android:layout_height="1dp"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
         />
 
     <androidx.constraintlayout.widget.ConstraintLayout
