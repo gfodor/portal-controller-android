@@ -60,23 +60,20 @@ public class MainActivity extends AppCompatActivity {
     private static final double MIN_OPENGL_VERSION = 3.0;
 
     // Adjustment Euler angles applied to ARCore poses (degrees)
-    private static final float ADJUST_Z_DEG = 0f;
-    private static final float ADJUST_Y_DEG = 0f;
+    private static final float ADJUST_X_DEG = 180f;
+    private static final float ADJUST_Z_DEG = -90f;
 
     private static final Pose ADJUST_POSE;
     static {
-        float z = (float) Math.toRadians(ADJUST_Z_DEG);
-        float y = (float) Math.toRadians(ADJUST_Y_DEG);
-        float cz = (float) Math.cos(z * 0.5f);
-        float sz = (float) Math.sin(z * 0.5f);
-        float cy = (float) Math.cos(y * 0.5f);
-        float sy = (float) Math.sin(y * 0.5f);
-        float[] q = new float[] {
-            -sz * sy,
-            cz * sy,
-            sz * cy,
-            cz * cy
-        };
+        float[] q = new float[4];
+        // Convert Euler angles to quaternion
+        double halfX = Math.toRadians(ADJUST_X_DEG) / 2.0;
+        double halfZ = Math.toRadians(ADJUST_Z_DEG) / 2.0;
+        q[0] = (float) Math.sin(halfX); // x
+        q[1] = 0f; // y
+        q[2] = (float) Math.sin(halfZ); // z
+        q[3] = (float) Math.cos(halfX) * (float) Math.cos(halfZ); // w
+
         ADJUST_POSE = new Pose(new float[] {0f, 0f, 0f}, q);
     }
 
@@ -95,10 +92,11 @@ public class MainActivity extends AppCompatActivity {
                     try {
                         Frame frame = arSession.update();
                         if (frame.getCamera().getTrackingState() == TrackingState.TRACKING) {
-                            Pose pose = ADJUST_POSE.compose(
-                                    frame.getCamera().getDisplayOrientedPose());
+                            Pose pose = frame.getCamera().getDisplayOrientedPose();
                             pose.getTranslation(cam_pos, 0);
-                            pose.getRotationQuaternion(cam_quat, 0);
+                            Pose adjustedPose = pose.compose(ADJUST_POSE);
+                            adjustedPose.getRotationQuaternion(cam_quat, 0);
+
                             runOnUiThread(() -> updatePoseViews());
                         }
                         captureImageForDetector(frame);
