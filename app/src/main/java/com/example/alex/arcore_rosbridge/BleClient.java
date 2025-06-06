@@ -47,6 +47,10 @@ public class BleClient {
     private static final byte PACKET_POSE       = 0x00;
     private static final byte PACKET_CALIBRATION = 0x01;
     private static final byte PACKET_APRILTAG    = 0x02;
+    private static final byte PACKET_BUTTON     = 0x03;
+
+    public static final byte BUTTON_VOL_UP   = 0x00;
+    public static final byte BUTTON_VOL_DOWN = 0x01;
 
     public BleClient(Context ctx, UUID serviceUuid) {
         this.context = ctx.getApplicationContext();
@@ -161,6 +165,20 @@ public class BleClient {
             return;
         }
         rxChar.setValue(new byte[] { PACKET_CALIBRATION });
+        gatt.writeCharacteristic(rxChar);
+    }
+
+    /** Send a button press or release event. */
+    public void sendButtonEvent(byte button, boolean pressed) {
+        if (!mtuReady || gatt == null || rxChar == null) {
+            Log.w(TAG, "Button event skipped – link not ready");
+            return;
+        }
+        ByteBuffer bb = ByteBuffer.allocate(3).order(ByteOrder.LITTLE_ENDIAN);
+        bb.put(PACKET_BUTTON);
+        bb.put(button);
+        bb.put((byte) (pressed ? 1 : 0));
+        rxChar.setValue(bb.array());
         gatt.writeCharacteristic(rxChar);
     }
 }

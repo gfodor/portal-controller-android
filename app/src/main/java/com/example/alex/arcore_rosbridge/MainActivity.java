@@ -23,6 +23,7 @@ import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
 import android.media.Image;
 import android.os.SystemClock;
+import android.view.KeyEvent;
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
@@ -58,6 +59,27 @@ public class MainActivity extends AppCompatActivity {
     private static final String TAG = MainActivity.class.getSimpleName();
     private static final double MIN_OPENGL_VERSION = 3.0;
 
+    // Adjustment Euler angles applied to ARCore poses (degrees)
+    private static final float ADJUST_Z_DEG = 0f;
+    private static final float ADJUST_Y_DEG = 0f;
+
+    private static final Pose ADJUST_POSE;
+    static {
+        float z = (float) Math.toRadians(ADJUST_Z_DEG);
+        float y = (float) Math.toRadians(ADJUST_Y_DEG);
+        float cz = (float) Math.cos(z * 0.5f);
+        float sz = (float) Math.sin(z * 0.5f);
+        float cy = (float) Math.cos(y * 0.5f);
+        float sy = (float) Math.sin(y * 0.5f);
+        float[] q = new float[] {
+            -sz * sy,
+            cz * sy,
+            sz * cy,
+            cz * cy
+        };
+        ADJUST_POSE = new Pose(new float[] {0f, 0f, 0f}, q);
+    }
+
     private Session arSession;
     private Button calibration_btn;
 
@@ -73,7 +95,8 @@ public class MainActivity extends AppCompatActivity {
                     try {
                         Frame frame = arSession.update();
                         if (frame.getCamera().getTrackingState() == TrackingState.TRACKING) {
-                            Pose pose = frame.getCamera().getDisplayOrientedPose();
+                            Pose pose = ADJUST_POSE.compose(
+                                    frame.getCamera().getDisplayOrientedPose());
                             pose.getTranslation(cam_pos, 0);
                             pose.getRotationQuaternion(cam_quat, 0);
                             runOnUiThread(() -> updatePoseViews());
@@ -427,5 +450,31 @@ public class MainActivity extends AppCompatActivity {
         SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss.SSS", Locale.US);
         String ts = sdf.format(new Date(millis));
         tagTimeTxt.setText("AprilTag @ " + ts);
+    }
+
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+            if (bleClient != null) {
+                byte btn = (keyCode == KeyEvent.KEYCODE_VOLUME_UP)
+                        ? BleClient.BUTTON_VOL_UP : BleClient.BUTTON_VOL_DOWN;
+                bleClient.sendButtonEvent(btn, true);
+            }
+            return true;
+        }
+        return super.onKeyDown(keyCode, event);
+    }
+
+    @Override
+    public boolean onKeyUp(int keyCode, KeyEvent event) {
+        if (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+            if (bleClient != null) {
+                byte btn = (keyCode == KeyEvent.KEYCODE_VOLUME_UP)
+                        ? BleClient.BUTTON_VOL_UP : BleClient.BUTTON_VOL_DOWN;
+                bleClient.sendButtonEvent(btn, false);
+            }
+            return true;
+        }
+        return super.onKeyUp(keyCode, event);
     }
 }
