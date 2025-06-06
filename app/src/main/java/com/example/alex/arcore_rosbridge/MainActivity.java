@@ -13,6 +13,7 @@ import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.FrameLayout;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
@@ -48,6 +49,8 @@ import org.opencv.android.OpenCVLoader;
 import org.firstinspires.ftc.robotcore.external.matrices.MatrixF;
 import java.util.ArrayList;
 import java.util.Locale;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -124,6 +127,9 @@ public class MainActivity extends AppCompatActivity {
     private TextView rot_z_txt;
     private TextView rot_w_txt;
 
+    // Timestamp when an AprilTag is detected
+    private TextView tagTimeTxt;
+
     // BLE integration
     private static final UUID PORTAL_SERVICE_UUID =
             UUID.fromString("f8b69c7b-3a91-4f2d-8e7a-9c4d35d5f49a");
@@ -170,6 +176,19 @@ public class MainActivity extends AppCompatActivity {
         rot_z_txt = findViewById(R.id.rot_z_txt);
         rot_w_txt = findViewById(R.id.rot_w_txt);
 
+        // ─── Timestamp overlay ───
+        tagTimeTxt = new TextView(this);
+        tagTimeTxt.setTextColor(0xFF0000FF);
+        tagTimeTxt.setTextSize(14);
+        tagTimeTxt.setPadding(16, 16, 16, 16);
+
+        // Place in top-left corner
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT);
+        lp.gravity = Gravity.TOP | Gravity.START;
+        // Add to root view
+        ((FrameLayout) findViewById(android.R.id.content)).addView(tagTimeTxt, lp);
 
         try {
             arSession = new Session(this);
@@ -312,7 +331,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void captureImageForDetector(Frame frame) {
         long now = SystemClock.uptimeMillis();
-        if (now - lastImageTime < 1000) return;
+        if (now - lastImageTime < 100) return;
         lastImageTime = now;
         try {
             Image img = frame.acquireCameraImage();
@@ -396,6 +415,17 @@ public class MainActivity extends AppCompatActivity {
             if (bleClient != null) {
                 bleClient.sendAprilTag(det.id, pos, rotMat);
             }
+
+            // Update timestamp on UI thread
+            runOnUiThread(() -> updateTagTimestamp(System.currentTimeMillis()));
         }
+    }
+
+    /** Formats and displays the given timestamp (milliseconds since epoch). */
+    private void updateTagTimestamp(long millis) {
+        if (tagTimeTxt == null) return;
+        SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss.SSS", Locale.US);
+        String ts = sdf.format(new Date(millis));
+        tagTimeTxt.setText("AprilTag @ " + ts);
     }
 }
