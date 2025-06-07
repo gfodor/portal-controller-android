@@ -23,6 +23,7 @@ import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
 import android.media.Image;
 import android.os.SystemClock;
+import android.view.KeyEvent;
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
@@ -58,11 +59,31 @@ public class MainActivity extends AppCompatActivity {
     private static final String TAG = MainActivity.class.getSimpleName();
     private static final double MIN_OPENGL_VERSION = 3.0;
 
+    // Right hand adjustments for Oculus Touch controller pose, when holding phone sideways
+    private static final float ADJUST_X_DEG = 180f;
+    private static final float ADJUST_Z_DEG = -90f;
+
+    private static final Pose ADJUST_POSE;
+    static {
+        float[] q = new float[4];
+        // Convert Euler angles to quaternion
+        double halfX = Math.toRadians(ADJUST_X_DEG) / 2.0;
+        double halfZ = Math.toRadians(ADJUST_Z_DEG) / 2.0;
+        q[0] = (float) Math.sin(halfX); // x
+        q[1] = 0f; // y
+        q[2] = (float) Math.sin(halfZ); // z
+        q[3] = (float) Math.cos(halfX) * (float) Math.cos(halfZ); // w
+
+        ADJUST_POSE = new Pose(new float[] {0f, 0f, 0f}, q);
+    }
+
     private Session arSession;
     private Button calibration_btn;
 
     private float[] cam_pos = new float[3];
     private float[] cam_quat = new float[4];
+
+    private final float[] raw_quat = new float[4];
 
     private GLSurfaceView glSurfaceView;
     private android.os.Handler frameHandler = new android.os.Handler();
@@ -75,7 +96,10 @@ public class MainActivity extends AppCompatActivity {
                         if (frame.getCamera().getTrackingState() == TrackingState.TRACKING) {
                             Pose pose = frame.getCamera().getDisplayOrientedPose();
                             pose.getTranslation(cam_pos, 0);
-                            pose.getRotationQuaternion(cam_quat, 0);
+                            pose.getRotationQuaternion(raw_quat, 0);
+                            Pose adjustedPose = pose.compose(ADJUST_POSE);
+                            adjustedPose.getRotationQuaternion(cam_quat, 0);
+
                             runOnUiThread(() -> updatePoseViews());
                         }
                         captureImageForDetector(frame);
@@ -413,7 +437,9 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
             if (bleClient != null) {
-                bleClient.sendAprilTag(det.id, pos, rotMat);
+                float[] camPosCopy = cam_pos.clone();
+                float[] camQuatCopy = raw_quat.clone();
+                bleClient.sendAprilTag(det.id, camPosCopy, camQuatCopy, pos, rotMat);
             }
 
             // Update timestamp on UI thread
@@ -427,5 +453,31 @@ public class MainActivity extends AppCompatActivity {
         SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss.SSS", Locale.US);
         String ts = sdf.format(new Date(millis));
         tagTimeTxt.setText("AprilTag @ " + ts);
+    }
+
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+            if (bleClient != null) {
+                byte btn = (keyCode == KeyEvent.KEYCODE_VOLUME_UP)
+                        ? BleClient.BUTTON_VOL_UP : BleClient.BUTTON_VOL_DOWN;
+                bleClient.sendButtonEvent(btn, true);
+            }
+            return true;
+        }
+        return super.onKeyDown(keyCode, event);
+    }
+
+    @Override
+    public boolean onKeyUp(int keyCode, KeyEvent event) {
+        if (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+            if (bleClient != null) {
+                byte btn = (keyCode == KeyEvent.KEYCODE_VOLUME_UP)
+                        ? BleClient.BUTTON_VOL_UP : BleClient.BUTTON_VOL_DOWN;
+                bleClient.sendButtonEvent(btn, false);
+            }
+            return true;
+        }
+        return super.onKeyUp(keyCode, event);
     }
 }

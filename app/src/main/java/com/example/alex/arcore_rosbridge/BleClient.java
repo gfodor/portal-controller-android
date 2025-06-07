@@ -38,7 +38,7 @@ public class BleClient {
     private static final UUID RX_UUID =
             UUID.fromString("f8b69c7b-3a91-4f2d-8e7a-9c4d35d5f49b");
     // NEW – desired ATT MTU and flag
-    private static final int DESIRED_MTU = 64;
+    private static final int DESIRED_MTU = 96;
     private volatile boolean mtuReady = false;
 
     private BluetoothGattCharacteristic rxChar;
@@ -47,6 +47,10 @@ public class BleClient {
     private static final byte PACKET_POSE       = 0x00;
     private static final byte PACKET_CALIBRATION = 0x01;
     private static final byte PACKET_APRILTAG    = 0x02;
+    private static final byte PACKET_BUTTON     = 0x03;
+
+    public static final byte BUTTON_VOL_UP   = 0x00;
+    public static final byte BUTTON_VOL_DOWN = 0x01;
 
     public BleClient(Context ctx, UUID serviceUuid) {
         this.context = ctx.getApplicationContext();
@@ -139,15 +143,23 @@ public class BleClient {
         boolean ok = gatt.writeCharacteristic(rxChar);
     }
 
-    public void sendAprilTag(int id, float[] pos, float[] rotMat) {
+    /** Send AprilTag detection with raw camera pose included. */
+    public void sendAprilTag(int id,
+                             float[] camPos, float[] camQuat,
+                             float[] pos, float[] rotMat) {
         if (!mtuReady || gatt == null || rxChar == null) {
             Log.w(TAG, "AprilTag send skipped – mtuReady=" + mtuReady + " gatt=" + (gatt != null) + " rxChar=" + (rxChar != null));
             return;
         }
-        if (pos.length < 3 || rotMat.length < 9) return;
-        ByteBuffer bb = ByteBuffer.allocate(1 + 4 + 4 * (3 + 9)).order(ByteOrder.LITTLE_ENDIAN);
+        if (camPos.length < 3 || camQuat.length < 4 || pos.length < 3 || rotMat.length < 9) return;
+
+        // Packet: [hdr][id][camPos(3f)][camQuat(4f)][tagPos(3f)][rot(9f)]
+        ByteBuffer bb = ByteBuffer.allocate(1 + 4 + 4 * (3 + 4 + 3 + 9))
+                                  .order(ByteOrder.LITTLE_ENDIAN);
         bb.put(PACKET_APRILTAG);
         bb.putInt(id);
+        for (int i = 0; i < 3; i++) bb.putFloat(camPos[i]);
+        for (int i = 0; i < 4; i++) bb.putFloat(camQuat[i]);
         for (int i = 0; i < 3; i++) bb.putFloat(pos[i]);
         for (int i = 0; i < 9; i++) bb.putFloat(rotMat[i]);
         rxChar.setValue(bb.array());
@@ -161,6 +173,20 @@ public class BleClient {
             return;
         }
         rxChar.setValue(new byte[] { PACKET_CALIBRATION });
+        gatt.writeCharacteristic(rxChar);
+    }
+
+    /** Send a button press or release event. */
+    public void sendButtonEvent(byte button, boolean pressed) {
+        if (!mtuReady || gatt == null || rxChar == null) {
+            Log.w(TAG, "Button event skipped – link not ready");
+            return;
+        }
+        ByteBuffer bb = ByteBuffer.allocate(3).order(ByteOrder.LITTLE_ENDIAN);
+        bb.put(PACKET_BUTTON);
+        bb.put(button);
+        bb.put((byte) (pressed ? 1 : 0));
+        rxChar.setValue(bb.array());
         gatt.writeCharacteristic(rxChar);
     }
 }
