@@ -59,7 +59,7 @@ public class MainActivity extends AppCompatActivity {
     private static final String TAG = MainActivity.class.getSimpleName();
     private static final double MIN_OPENGL_VERSION = 3.0;
 
-    // Adjustment Euler angles applied to ARCore poses (degrees)
+    // Right hand adjustments for Oculus Touch controller pose, when holding phone sideways
     private static final float ADJUST_X_DEG = 180f;
     private static final float ADJUST_Z_DEG = -90f;
 
@@ -83,6 +83,8 @@ public class MainActivity extends AppCompatActivity {
     private float[] cam_pos = new float[3];
     private float[] cam_quat = new float[4];
 
+    private final float[] raw_quat = new float[4];
+
     private GLSurfaceView glSurfaceView;
     private android.os.Handler frameHandler = new android.os.Handler();
     private final Runnable frameUpdate = new Runnable() {
@@ -94,6 +96,7 @@ public class MainActivity extends AppCompatActivity {
                         if (frame.getCamera().getTrackingState() == TrackingState.TRACKING) {
                             Pose pose = frame.getCamera().getDisplayOrientedPose();
                             pose.getTranslation(cam_pos, 0);
+                            pose.getRotationQuaternion(raw_quat, 0);
                             Pose adjustedPose = pose.compose(ADJUST_POSE);
                             adjustedPose.getRotationQuaternion(cam_quat, 0);
 
@@ -434,7 +437,9 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
             if (bleClient != null) {
-                bleClient.sendAprilTag(det.id, pos, rotMat);
+                float[] camPosCopy = cam_pos.clone();
+                float[] camQuatCopy = raw_quat.clone();
+                bleClient.sendAprilTag(det.id, camPosCopy, camQuatCopy, pos, rotMat);
             }
 
             // Update timestamp on UI thread
